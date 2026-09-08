@@ -295,8 +295,8 @@ func getTextPartHeader(body []byte, mimeType rfc822.MIMEType) message.Header {
 func getAttachmentPartHeader(att Attachment) message.Header {
 	var header message.Header
 
-	for _, key := range att.Headers.Order {
-		for _, val := range att.Headers.Values[key] {
+	for key, val := range att.Headers {
+		for _, val := range val {
 			header.Add(key, val)
 		}
 	}

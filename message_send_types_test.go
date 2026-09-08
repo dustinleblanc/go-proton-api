@@ -1,11 +1,10 @@
-package proton_test
+package proton
 
 import (
 	"testing"
 
 	"github.com/ProtonMail/gluon/rfc822"
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
-	"github.com/henrybear327/go-proton-api"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,16 +18,16 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 	tests := []struct {
 		name     string
 		mimeBody string
-		prefs    map[string]proton.SendPreferences
+		prefs    map[string]SendPreferences
 		wantErr  bool
 	}{
 		{
 			name:     "Clear MIME with detached signature",
 			mimeBody: "this is a mime body",
-			prefs: map[string]proton.SendPreferences{"mime-sign@email.com": {
+			prefs: map[string]SendPreferences{"mime-sign@email.com": {
 				Encrypt:          false,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.ClearMIMEScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: ClearMIMEScheme,
 				MIMEType:         rfc822.MultipartMixed,
 			}},
 			wantErr: false,
@@ -36,10 +35,10 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 		{
 			name:     "Clear MIME with no signature (error)",
 			mimeBody: "this is a mime body",
-			prefs: map[string]proton.SendPreferences{"mime-no-sign@email.com": {
+			prefs: map[string]SendPreferences{"mime-no-sign@email.com": {
 				Encrypt:          false,
-				SignatureType:    proton.NoSignature,
-				EncryptionScheme: proton.ClearMIMEScheme,
+				SignatureType:    NoSignature,
+				EncryptionScheme: ClearMIMEScheme,
 				MIMEType:         rfc822.MultipartMixed,
 			}},
 			wantErr: true,
@@ -47,10 +46,10 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 		{
 			name:     "Clear MIME with plain text (error)",
 			mimeBody: "this is a mime body",
-			prefs: map[string]proton.SendPreferences{"mime-plain@email.com": {
+			prefs: map[string]SendPreferences{"mime-plain@email.com": {
 				Encrypt:          false,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.ClearMIMEScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: ClearMIMEScheme,
 				MIMEType:         rfc822.TextPlain,
 			}},
 			wantErr: true,
@@ -58,10 +57,10 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 		{
 			name:     "Clear MIME with rich text (error)",
 			mimeBody: "this is a mime body",
-			prefs: map[string]proton.SendPreferences{"mime-html@email.com": {
+			prefs: map[string]SendPreferences{"mime-html@email.com": {
 				Encrypt:          false,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.ClearMIMEScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: ClearMIMEScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: true,
@@ -69,11 +68,11 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 		{
 			name:     "PGP MIME with detached signature",
 			mimeBody: "this is a mime body",
-			prefs: map[string]proton.SendPreferences{"mime-encrypted@email.com": {
+			prefs: map[string]SendPreferences{"mime-encrypted@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.PGPMIMEScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: PGPMIMEScheme,
 				MIMEType:         rfc822.MultipartMixed,
 			}},
 			wantErr: false,
@@ -81,11 +80,11 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 		{
 			name:     "PGP MIME with plain text (error)",
 			mimeBody: "this is a mime body",
-			prefs: map[string]proton.SendPreferences{"mime-encrypted-plain@email.com": {
+			prefs: map[string]SendPreferences{"mime-encrypted-plain@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.PGPMIMEScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: PGPMIMEScheme,
 				MIMEType:         rfc822.TextPlain,
 			}},
 			wantErr: true,
@@ -93,11 +92,11 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 		{
 			name:     "PGP MIME with rich text (error)",
 			mimeBody: "this is a mime body",
-			prefs: map[string]proton.SendPreferences{"mime-encrypted-plain@email.com": {
+			prefs: map[string]SendPreferences{"mime-encrypted-plain@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.PGPMIMEScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: PGPMIMEScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: true,
@@ -105,10 +104,10 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 		{
 			name:     "PGP MIME with missing public key (error)",
 			mimeBody: "this is a mime body",
-			prefs: map[string]proton.SendPreferences{"mime-encrypted-no-pubkey@email.com": {
+			prefs: map[string]SendPreferences{"mime-encrypted-no-pubkey@email.com": {
 				Encrypt:          true,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.PGPMIMEScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: PGPMIMEScheme,
 				MIMEType:         rfc822.MultipartMixed,
 			}},
 			wantErr: true,
@@ -116,11 +115,11 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 		{
 			name:     "PGP MIME with no signature (error)",
 			mimeBody: "this is a mime body",
-			prefs: map[string]proton.SendPreferences{"mime-encrypted-no-signature@email.com": {
+			prefs: map[string]SendPreferences{"mime-encrypted-no-signature@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.NoSignature,
-				EncryptionScheme: proton.PGPMIMEScheme,
+				SignatureType:    NoSignature,
+				EncryptionScheme: PGPMIMEScheme,
 				MIMEType:         rfc822.MultipartMixed,
 			}},
 			wantErr: true,
@@ -129,7 +128,7 @@ func TestSendDraftReq_AddMIMEPackage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var req proton.SendDraftReq
+			var req SendDraftReq
 
 			if err := req.AddMIMEPackage(kr, tt.mimeBody, tt.prefs); (err != nil) != tt.wantErr {
 				t.Errorf("SendDraftReq.AddMIMEPackage() error = %v, wantErr %v", err, tt.wantErr)
@@ -149,7 +148,7 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 		name     string
 		body     string
 		mimeType rfc822.MIMEType
-		prefs    map[string]proton.SendPreferences
+		prefs    map[string]SendPreferences
 		attKeys  map[string]*crypto.SessionKey
 		wantErr  bool
 	}{
@@ -157,11 +156,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "internal plain text with detached signature",
 			body:     "this is a text/plain body",
 			mimeType: rfc822.TextPlain,
-			prefs: map[string]proton.SendPreferences{"internal-plain@email.com": {
+			prefs: map[string]SendPreferences{"internal-plain@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.InternalScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: InternalScheme,
 				MIMEType:         rfc822.TextPlain,
 			}},
 			wantErr: false,
@@ -170,11 +169,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "internal rich text with detached signature",
 			body:     "this is a text/html body",
 			mimeType: rfc822.TextHTML,
-			prefs: map[string]proton.SendPreferences{"internal-html@email.com": {
+			prefs: map[string]SendPreferences{"internal-html@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.InternalScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: InternalScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: false,
@@ -183,11 +182,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "internal rich text with bad package content type (error)",
 			body:     "this is a text/html body",
 			mimeType: "bad content type",
-			prefs: map[string]proton.SendPreferences{"internal-bad-package-content-type@email.com": {
+			prefs: map[string]SendPreferences{"internal-bad-package-content-type@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.InternalScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: InternalScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: true,
@@ -196,11 +195,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "internal rich text with bad recipient content type (error)",
 			body:     "this is a text/html body",
 			mimeType: rfc822.TextHTML,
-			prefs: map[string]proton.SendPreferences{"internal-bad-recipient-content-type@email.com": {
+			prefs: map[string]SendPreferences{"internal-bad-recipient-content-type@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.InternalScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: InternalScheme,
 				MIMEType:         "bad content type",
 			}},
 			wantErr: true,
@@ -209,11 +208,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "internal with multipart (error)",
 			body:     "this is a text/html body",
 			mimeType: rfc822.MultipartMixed,
-			prefs: map[string]proton.SendPreferences{"internal-multipart-mixed@email.com": {
+			prefs: map[string]SendPreferences{"internal-multipart-mixed@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.InternalScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: InternalScheme,
 				MIMEType:         rfc822.MultipartMixed,
 			}},
 			wantErr: true,
@@ -222,11 +221,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "internal without encryption (error)",
 			body:     "this is a text/html body",
 			mimeType: rfc822.TextHTML,
-			prefs: map[string]proton.SendPreferences{"internal-no-encrypt@email.com": {
+			prefs: map[string]SendPreferences{"internal-no-encrypt@email.com": {
 				Encrypt:          false,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.InternalScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: InternalScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: true,
@@ -235,10 +234,10 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "internal without pubkey (error)",
 			body:     "this is a text/html body",
 			mimeType: rfc822.TextHTML,
-			prefs: map[string]proton.SendPreferences{"internal-no-pubkey@email.com": {
+			prefs: map[string]SendPreferences{"internal-no-pubkey@email.com": {
 				Encrypt:          true,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.InternalScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: InternalScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: true,
@@ -247,11 +246,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "internal without signature (error)",
 			body:     "this is a text/html body",
 			mimeType: rfc822.TextHTML,
-			prefs: map[string]proton.SendPreferences{"internal-no-sig@email.com": {
+			prefs: map[string]SendPreferences{"internal-no-sig@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.NoSignature,
-				EncryptionScheme: proton.InternalScheme,
+				SignatureType:    NoSignature,
+				EncryptionScheme: InternalScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: true,
@@ -260,10 +259,10 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "clear rich text without signature",
 			body:     "this is a text/html body",
 			mimeType: rfc822.TextHTML,
-			prefs: map[string]proton.SendPreferences{"clear-rich@email.com": {
+			prefs: map[string]SendPreferences{"clear-rich@email.com": {
 				Encrypt:          false,
-				SignatureType:    proton.NoSignature,
-				EncryptionScheme: proton.ClearScheme,
+				SignatureType:    NoSignature,
+				EncryptionScheme: ClearScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: false,
@@ -272,10 +271,10 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "clear plain text without signature",
 			body:     "this is a text/plain body",
 			mimeType: rfc822.TextPlain,
-			prefs: map[string]proton.SendPreferences{"clear-plain@email.com": {
+			prefs: map[string]SendPreferences{"clear-plain@email.com": {
 				Encrypt:          false,
-				SignatureType:    proton.NoSignature,
-				EncryptionScheme: proton.ClearScheme,
+				SignatureType:    NoSignature,
+				EncryptionScheme: ClearScheme,
 				MIMEType:         rfc822.TextPlain,
 			}},
 			wantErr: false,
@@ -284,10 +283,10 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "clear plain text with signature",
 			body:     "this is a text/plain body",
 			mimeType: rfc822.TextPlain,
-			prefs: map[string]proton.SendPreferences{"clear-plain-with-sig@email.com": {
+			prefs: map[string]SendPreferences{"clear-plain-with-sig@email.com": {
 				Encrypt:          false,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.ClearScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: ClearScheme,
 				MIMEType:         rfc822.TextPlain,
 			}},
 			wantErr: false,
@@ -296,10 +295,10 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "clear plain text with bad scheme (error)",
 			body:     "this is a text/plain body",
 			mimeType: rfc822.TextPlain,
-			prefs: map[string]proton.SendPreferences{"clear-plain-with-sig@email.com": {
+			prefs: map[string]SendPreferences{"clear-plain-with-sig@email.com": {
 				Encrypt:          false,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.PGPInlineScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: PGPInlineScheme,
 				MIMEType:         rfc822.TextPlain,
 			}},
 			wantErr: true,
@@ -308,10 +307,10 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "clear rich text with signature (error)",
 			body:     "this is a text/html body",
 			mimeType: rfc822.TextHTML,
-			prefs: map[string]proton.SendPreferences{"clear-plain-with-sig@email.com": {
+			prefs: map[string]SendPreferences{"clear-plain-with-sig@email.com": {
 				Encrypt:          false,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.ClearScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: ClearScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: true,
@@ -320,11 +319,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "encrypted plain text with signature",
 			body:     "this is a text/plain body",
 			mimeType: rfc822.TextPlain,
-			prefs: map[string]proton.SendPreferences{"pgp-inline-with-sig@email.com": {
+			prefs: map[string]SendPreferences{"pgp-inline-with-sig@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.PGPInlineScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: PGPInlineScheme,
 				MIMEType:         rfc822.TextPlain,
 			}},
 			wantErr: false,
@@ -333,11 +332,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "encrypted html text with signature (error)",
 			body:     "this is a text/html body",
 			mimeType: rfc822.TextHTML,
-			prefs: map[string]proton.SendPreferences{"pgp-inline-rich-with-sig@email.com": {
+			prefs: map[string]SendPreferences{"pgp-inline-rich-with-sig@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.PGPInlineScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: PGPInlineScheme,
 				MIMEType:         rfc822.TextHTML,
 			}},
 			wantErr: true,
@@ -346,11 +345,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "encrypted mixed text with signature (error)",
 			body:     "this is a multipart/mixed body",
 			mimeType: rfc822.MultipartMixed,
-			prefs: map[string]proton.SendPreferences{"pgp-inline-mixed-with-sig@email.com": {
+			prefs: map[string]SendPreferences{"pgp-inline-mixed-with-sig@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.PGPInlineScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: PGPInlineScheme,
 				MIMEType:         rfc822.MultipartMixed,
 			}},
 			wantErr: true,
@@ -359,11 +358,11 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 			name:     "encrypted for outside (error)",
 			body:     "this is a text/plain body",
 			mimeType: rfc822.TextPlain,
-			prefs: map[string]proton.SendPreferences{"enc-for-outside@email.com": {
+			prefs: map[string]SendPreferences{"enc-for-outside@email.com": {
 				Encrypt:          true,
 				PubKey:           kr,
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.EncryptedOutsideScheme,
+				SignatureType:    DetachedSignature,
+				EncryptionScheme: EncryptedOutsideScheme,
 				MIMEType:         rfc822.TextPlain,
 			}},
 			wantErr: true,
@@ -372,7 +371,7 @@ func TestSendDraftReq_AddPackage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var req proton.SendDraftReq
+			var req SendDraftReq
 
 			if err := req.AddTextPackage(kr, tt.body, tt.mimeType, tt.prefs, tt.attKeys); (err != nil) != tt.wantErr {
 				t.Errorf("SendDraftReq.AddPackage() error = %v, wantErr %v", err, tt.wantErr)

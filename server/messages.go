@@ -12,7 +12,6 @@ import (
 
 	"github.com/ProtonMail/gluon/rfc822"
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
-	"github.com/bradenaw/juniper/xslices"
 	"github.com/gin-gonic/gin"
 	"github.com/henrybear327/go-proton-api"
 	"golang.org/x/exp/slices"
@@ -102,7 +101,7 @@ func (s *Server) postMailMessages(c *gin.Context) {
 		return
 	}
 
-	message, err := s.b.CreateDraft(c.GetString("UserID"), addrID, req.Message, req.ParentID, req.Action)
+	message, err := s.b.CreateDraft(c.GetString("UserID"), addrID, req.Message, req.ParentID)
 	if err != nil {
 		c.AbortWithStatus(http.StatusUnprocessableEntity)
 		return
@@ -222,62 +221,6 @@ func (s *Server) handlePutMailMessagesUnread() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusUnprocessableEntity)
 			return
 		}
-	}
-}
-
-func (s *Server) handlePutMailMessagesForwarded() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req proton.MessageActionReq
-
-		if err := c.BindJSON(&req); err != nil {
-			c.AbortWithStatus(http.StatusBadRequest)
-			return
-		}
-
-		if err := s.b.SetMessagesForwarded(c.GetString("UserID"), true, req.IDs...); err != nil {
-			c.AbortWithStatus(http.StatusUnprocessableEntity)
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"Code": 1001,
-			"Responses": xslices.Map(req.IDs, func(id string) any {
-				return gin.H{
-					"ID": id,
-					"Response": gin.H{
-						"Code": 1000,
-					},
-				}
-			}),
-		})
-	}
-}
-
-func (s *Server) handlePutMailMessagesUnforwarded() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req proton.MessageActionReq
-
-		if err := c.BindJSON(&req); err != nil {
-			c.AbortWithStatus(http.StatusBadRequest)
-			return
-		}
-
-		if err := s.b.SetMessagesForwarded(c.GetString("UserID"), false, req.IDs...); err != nil {
-			c.AbortWithStatus(http.StatusUnprocessableEntity)
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"Code": 1001,
-			"Responses": xslices.Map(req.IDs, func(id string) any {
-				return gin.H{
-					"ID": id,
-					"Response": gin.H{
-						"Code": 1000,
-					},
-				}
-			}),
-		})
 	}
 }
 
@@ -487,27 +430,6 @@ func (s *Server) parseMessage(literal []byte) (*rfc822.Header, []string, []*rfc8
 	// Force all multipart types to be multipart/mixed.
 	if mimeType.Type() == "multipart" {
 		mimeType = "multipart/mixed"
-		children, err := root.Children()
-		// or determine it if there is only one (non-attachment) child
-		if err == nil && (len(children)-len(atts)) <= 1 {
-			var isHtml = false
-			var isTxt = false
-			for _, child := range children {
-				contentType, _, err := child.ContentType()
-				if err != nil {
-					continue
-				} else if contentType == rfc822.TextHTML {
-					isHtml = true
-				} else if contentType == rfc822.TextPlain {
-					isTxt = true
-				}
-			}
-			if isHtml {
-				mimeType = "text/html"
-			} else if isTxt {
-				mimeType = "text/plain"
-			}
-		}
 	}
 
 	return header, body, atts, mimeType, nil
@@ -603,8 +525,8 @@ func (s *Server) importBody(
 		subject,
 		sender,
 		toList, ccList, bccList, replytos,
-		body[0],
-		mimeType,
+		string(body[0]),
+		rfc822.MIMEType(mimeType),
 		flags,
 		date,
 		unread, starred,

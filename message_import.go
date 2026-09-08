@@ -26,9 +26,7 @@ const (
 var ErrImportEncrypt = errors.New("failed to encrypt message")
 var ErrImportSizeExceeded = errors.New("message exceeds maximum import size of 30MB")
 
-type ImportResStream stream.Stream[ImportRes] // gomock does not support generics. In order to be able to mock ImportMessages, we introduce a typedef.
-
-func (c *Client) ImportMessages(ctx context.Context, addrKR *crypto.KeyRing, workers, buffer int, req ...ImportReq) (ImportResStream, error) {
+func (c *Client) ImportMessages(ctx context.Context, addrKR *crypto.KeyRing, workers, buffer int, req ...ImportReq) (stream.Stream[ImportRes], error) {
 	// Encrypt each message.
 	for idx := range req {
 		enc, err := EncryptRFC822(addrKR, req[idx].Message)
@@ -46,7 +44,7 @@ func (c *Client) ImportMessages(ctx context.Context, addrKR *crypto.KeyRing, wor
 
 	return stream.Flatten(parallel.MapStream(
 		ctx,
-		stream.FromIterator(iterator.Slice(ChunkSized(req, maxImportCount, maxImportSize, func(req ImportReq) int {
+		stream.FromIterator(iterator.Slice(chunkSized(req, maxImportCount, maxImportSize, func(req ImportReq) int {
 			return len(req.Message)
 		}))),
 		workers,
@@ -61,7 +59,7 @@ func (c *Client) ImportMessages(ctx context.Context, addrKR *crypto.KeyRing, wor
 
 			for _, res := range res {
 				if res.Code != SuccessCode {
-					return nil, fmt.Errorf("failed to import message: %w", res)
+					return nil, fmt.Errorf("failed to import message: %w", res.APIError)
 				}
 			}
 
@@ -115,9 +113,9 @@ func (c *Client) importMessages(ctx context.Context, req []ImportReq) ([]ImportR
 	}), nil
 }
 
-// ChunkSized splits a slice into chunks of maximum size and length.
+// chunkSized splits a slice into chunks of maximum size and length.
 // It is assumed that the size of each element is less than the maximum size.
-func ChunkSized[T any](vals []T, maxLen, maxSize int, getSize func(T) int) [][]T {
+func chunkSized[T any](vals []T, maxLen, maxSize int, getSize func(T) int) [][]T {
 	var chunks [][]T
 
 	for len(vals) > 0 {

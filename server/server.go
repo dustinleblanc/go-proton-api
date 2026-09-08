@@ -155,20 +155,8 @@ func (s *Server) CreateAddressAsUpdate(userID, email string, password []byte) (s
 	return s.b.CreateAddressAsUpdate(userID, email, password, true, proton.AddressStatusEnabled, proton.AddressTypeOriginal)
 }
 
-func (s *Server) ChangeAddressAllowSend(userID, addrID string, allowSend bool) error {
-	return s.b.ChangeAddressAllowSend(userID, addrID, allowSend)
-}
-
-func (s *Server) SetAddressOrder(userID string, addrIDs []string) error {
-	return s.b.SetAddressOrder(userID, addrIDs)
-}
-
 func (s *Server) ChangeAddressType(userID, addrId string, addrType proton.AddressType) error {
 	return s.b.ChangeAddressType(userID, addrId, addrType)
-}
-
-func (s *Server) ChangeAddressDisplayName(userID, addrID, displayName string) error {
-	return s.b.ChangeAddressDisplayName(userID, addrID, displayName)
 }
 
 func (s *Server) RemoveAddress(userID, addrID string) error {
@@ -251,16 +239,4 @@ func (s *Server) RevokeUser(userID string) error {
 func (s *Server) Close() {
 	s.proxyTransport.CloseIdleConnections()
 	s.s.Close()
-}
-
-func (s *Server) PushFeatureFlag(flagName string) {
-	s.b.PushFeatureFlag(flagName)
-}
-
-func (s *Server) DeleteFeatureFlags() {
-	s.b.DeleteFeatureFlags()
-}
-
-func (s *Server) GetObservabilityStatistics() backend.ObservabilityStatistics {
-	return s.b.GetObservabilityStatistics()
 }

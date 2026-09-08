@@ -19,21 +19,18 @@ import (
 type Code int
 
 const (
-	SuccessCode                 Code = 1000
-	MultiCode                   Code = 1001
-	InvalidValue                Code = 2001
-	AppVersionMissingCode       Code = 5001
-	AppVersionBadCode           Code = 5003
-	UsernameInvalid             Code = 6003 // Deprecated, but still used.
-	PasswordWrong               Code = 8002
-	HumanVerificationRequired   Code = 9001
-	PaidPlanRequired            Code = 10004
-	AuthRefreshTokenInvalid     Code = 10013
-	HumanValidationInvalidToken Code = 12087
-
-	// ProtonDrive
-	AFileOrFolderNameExist Code = 2500
-	ADraftExist            Code = 2500
+	SuccessCode               Code = 1000
+	MultiCode                 Code = 1001
+	InvalidValue              Code = 2001
+	AFileOrFolderNameExist    Code = 2500
+	ADraftExist               Code = 2500
+	AppVersionMissingCode     Code = 5001
+	AppVersionBadCode         Code = 5003
+	UsernameInvalid           Code = 6003 // Deprecated, but still used.
+	PasswordWrong             Code = 8002
+	HumanVerificationRequired Code = 9001
+	PaidPlanRequired          Code = 10004
+	AuthRefreshTokenInvalid   Code = 10013
 )
 
 var (
@@ -41,8 +38,6 @@ var (
 	ErrFolderNameExist = errors.New("a folder with that name already exists (Code=2500, Status=422)")
 	ErrADraftExist     = errors.New("draft already exists on this revision (Code=2500, Status=409)")
 )
-
-type ErrDetails []byte
 
 // APIError represents an error returned by the API.
 type APIError struct {
@@ -56,16 +51,11 @@ type APIError struct {
 	Message string `json:"Error"`
 
 	// Details contains optional error details which are specific to each request.
-	// Note that the contents of this field needs to be valid serialized JSON.
-	Details ErrDetails `json:"Details,omitempty"`
+	Details any
 }
 
 func (err APIError) Error() string {
 	return fmt.Sprintf("%v (Code=%v, Status=%v)", err.Message, err.Code, err.Status)
-}
-
-func (err APIError) IsHVError() bool {
-	return err.Code == HumanVerificationRequired
 }
 
 func (err APIError) DetailsToString() string {
@@ -73,7 +63,12 @@ func (err APIError) DetailsToString() string {
 		return ""
 	}
 
-	return string(err.Details)
+	bytes, e := json.Marshal(err.Details)
+	if e != nil {
+		return fmt.Sprintf("Failed to generate json: %v", e)
+	}
+
+	return string(bytes)
 }
 
 // NetError represents a network error. It is returned when the API is unreachable.
@@ -169,7 +164,8 @@ func catchRetryAfter(_ *resty.Client, res *resty.Response) (time.Duration, error
 	// Add some jitter to the delay.
 	after += rand.Intn(10)
 
-	log.WithFields(logrus.Fields{
+	logrus.WithFields(logrus.Fields{
+		"pkg":    "go-proton-api",
 		"status": res.StatusCode(),
 		"url":    res.Request.URL,
 		"method": res.Request.Method,
@@ -246,13 +242,4 @@ func parseRawAPIError(rawResponse io.ReadCloser) (*APIError, bool) {
 	}
 
 	return &apiErr, true
-}
-
-func (d ErrDetails) MarshalJSON() ([]byte, error) {
-	return d, nil
-}
-
-func (d *ErrDetails) UnmarshalJSON(data []byte) error {
-	*d = data
-	return nil
 }

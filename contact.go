@@ -50,15 +50,8 @@ func (c *Client) CountContactEmails(ctx context.Context, email string) (int, err
 }
 
 func (c *Client) GetContacts(ctx context.Context, page, pageSize int) ([]Contact, error) {
-	_, contacts, err := c.getContactsImpl(ctx, page, pageSize)
-
-	return contacts, err
-}
-
-func (c *Client) getContactsImpl(ctx context.Context, page, pageSize int) (int, []Contact, error) {
 	var res struct {
 		Contacts []Contact
-		Total    int
 	}
 
 	if err := c.do(ctx, func(r *resty.Request) (*resty.Response, error) {
@@ -67,58 +60,26 @@ func (c *Client) getContactsImpl(ctx context.Context, page, pageSize int) (int, 
 			"PageSize": strconv.Itoa(pageSize),
 		}).SetResult(&res).Get("/contacts/v4")
 	}); err != nil {
-		return 0, nil, err
+		return nil, err
 	}
 
-	return res.Total, res.Contacts, nil
+	return res.Contacts, nil
 }
 
 func (c *Client) GetAllContacts(ctx context.Context) ([]Contact, error) {
-	return c.GetAllContactsPaged(ctx, maxPageSize)
-}
-
-func (c *Client) GetAllContactsPaged(ctx context.Context, pageSize int) ([]Contact, error) {
-	if pageSize > maxPageSize {
-		pageSize = maxPageSize
-	}
-
-	total, firstBatch, err := c.getContactsImpl(ctx, 0, pageSize)
+	total, err := c.CountContacts(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if total <= pageSize {
-		return firstBatch, nil
-	}
-
-	remainingPages := (total / pageSize) + 1
-
-	for i := 1; i < remainingPages; i++ {
-		_, batch, err := c.getContactsImpl(ctx, i, pageSize)
-		if err != nil {
-			return nil, err
-		}
-
-		firstBatch = append(firstBatch, batch...)
-	}
-
-	return firstBatch, err
+	return fetchPaged(ctx, total, maxPageSize, c, func(ctx context.Context, page, pageSize int) ([]Contact, error) {
+		return c.GetContacts(ctx, page, pageSize)
+	})
 }
 
 func (c *Client) GetContactEmails(ctx context.Context, email string, page, pageSize int) ([]ContactEmail, error) {
-	if pageSize > maxPageSize {
-		pageSize = maxPageSize
-	}
-
-	_, contacts, err := c.getContactEmailsImpl(ctx, email, page, pageSize)
-
-	return contacts, err
-}
-
-func (c *Client) getContactEmailsImpl(ctx context.Context, email string, page, pageSize int) (int, []ContactEmail, error) {
 	var res struct {
 		ContactEmails []ContactEmail
-		Total         int
 	}
 
 	if err := c.do(ctx, func(r *resty.Request) (*resty.Response, error) {
@@ -128,42 +89,21 @@ func (c *Client) getContactEmailsImpl(ctx context.Context, email string, page, p
 			"Email":    email,
 		}).SetResult(&res).Get("/contacts/v4/emails")
 	}); err != nil {
-		return 0, nil, err
+		return nil, err
 	}
 
-	return res.Total, res.ContactEmails, nil
+	return res.ContactEmails, nil
 }
 
 func (c *Client) GetAllContactEmails(ctx context.Context, email string) ([]ContactEmail, error) {
-	return c.GetAllContactEmailsPaged(ctx, email, maxPageSize)
-}
-
-func (c *Client) GetAllContactEmailsPaged(ctx context.Context, email string, pageSize int) ([]ContactEmail, error) {
-	if pageSize > maxPageSize {
-		pageSize = maxPageSize
-	}
-
-	total, firstBatch, err := c.getContactEmailsImpl(ctx, email, 0, pageSize)
+	total, err := c.CountContactEmails(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 
-	if total <= pageSize {
-		return firstBatch, nil
-	}
-
-	remainingPages := (total / pageSize) + 1
-
-	for i := 1; i < remainingPages; i++ {
-		_, batch, err := c.getContactEmailsImpl(ctx, email, i, pageSize)
-		if err != nil {
-			return nil, err
-		}
-
-		firstBatch = append(firstBatch, batch...)
-	}
-
-	return firstBatch, err
+	return fetchPaged(ctx, total, maxPageSize, c, func(ctx context.Context, page, pageSize int) ([]ContactEmail, error) {
+		return c.GetContactEmails(ctx, email, page, pageSize)
+	})
 }
 
 func (c *Client) CreateContacts(ctx context.Context, req CreateContactsReq) ([]CreateContactsRes, error) {

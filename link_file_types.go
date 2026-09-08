@@ -146,6 +146,37 @@ type CommitRevisionReq struct {
 	ManifestSignature string
 	SignatureAddress  string
 	XAttr             string
+
+	// Photo is required (added locally -- this fork predates it) when
+	// committing a revision in a Photos-type share. Confirmed from
+	// Proton's own official Drive SDK (CommitRevisionDto/
+	// CommitRevisionPhotoDto in the generated API types): unlike XAttr,
+	// this is a PLAINTEXT field -- the server can't read inside the
+	// encrypted XAttr, so it needs CaptureTime/ContentHash unencrypted to
+	// validate and index the photo.
+	Photo *CommitRevisionPhoto `json:",omitempty"`
+}
+
+type CommitRevisionPhoto struct {
+	// CaptureTime is Unix seconds (not ISO8601, unlike the XAttr Camera
+	// field -- confirmed from the schema doc: "Photo capture timestamp (in
+	// seconds), use negative values for times before 1970").
+	CaptureTime int64
+
+	// ContentHash: lower_hex(hmacSha256(parent folder hash key,
+	// lower_hex(sha1(plain content)))) -- confirmed from the schema doc.
+	ContentHash string
+}
+
+// ComputePhotoContentHash implements the ContentHash formula from
+// CommitRevisionPhotoDto's schema doc: HMAC-SHA256 keyed with the parent
+// folder's hash key (the same key used for filename hashing), over the
+// ASCII hex string of the plaintext content's SHA1 -- not over the raw
+// SHA1 bytes.
+func ComputePhotoContentHash(parentHashKey []byte, sha1HexOfPlainContent string) string {
+	mac := hmac.New(sha256.New, parentHashKey)
+	mac.Write([]byte(sha1HexOfPlainContent))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 type RevisionXAttrCommon struct {
@@ -155,11 +186,22 @@ type RevisionXAttrCommon struct {
 	Digests          map[string]string
 }
 
-type RevisionXAttr struct {
-	Common RevisionXAttrCommon
+// RevisionXAttrCamera carries the metadata a Photos-share revision commit
+// requires (added locally -- this fork predates the requirement). Confirmed
+// from Proton's own official Drive SDK
+// (client/js/src/internal/nodes/extendedAttributes.ts): without at least
+// CaptureTime set, the server rejects the commit with "Cannot commit
+// Revision in Photo Share without Photo attributes" (Code=2511).
+type RevisionXAttrCamera struct {
+	CaptureTime string `json:",omitempty"` // ISO8601, e.g. "2021-09-16T07:40:54.000Z"
 }
 
-func (commitRevisionReq *CommitRevisionReq) SetEncXAttrString(addrKR, nodeKR *crypto.KeyRing, xAttrCommon *RevisionXAttrCommon) error {
+type RevisionXAttr struct {
+	Common RevisionXAttrCommon
+	Camera *RevisionXAttrCamera `json:",omitempty"`
+}
+
+func (commitRevisionReq *CommitRevisionReq) SetEncXAttrString(addrKR, nodeKR *crypto.KeyRing, xAttrCommon *RevisionXAttrCommon, camera *RevisionXAttrCamera) error {
 	// Source
 	// - https://github.com/ProtonMail/WebClients/blob/099a2451b51dea38b5f0e07ec3b8fcce07a88303/packages/shared/lib/interfaces/drive/link.ts#L53
 	// - https://github.com/ProtonMail/WebClients/blob/main/applications/drive/src/app/store/_links/extendedAttributes.ts#L139
@@ -175,6 +217,7 @@ func (commitRevisionReq *CommitRevisionReq) SetEncXAttrString(addrKR, nodeKR *cr
 
 	jsonByteArr, err := json.Marshal(RevisionXAttr{
 		Common: *xAttrCommon,
+		Camera: camera,
 	})
 	if err != nil {
 		return err

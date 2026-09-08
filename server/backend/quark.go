@@ -77,8 +77,6 @@ func (s *Backend) quarkUserCreate(args ...string) (proton.User, error) {
 		}
 	}
 
-	log.Infof("User '%v' created with id=%v", *name, userID)
-
 	return s.GetUser(userID)
 }
 

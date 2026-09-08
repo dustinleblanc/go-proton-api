@@ -11,11 +11,10 @@ import (
 )
 
 const (
-	FieldPMScheme           = "X-PM-SCHEME"
-	FieldPMSign             = "X-PM-SIGN"
-	FieldPMEncrypt          = "X-PM-ENCRYPT"
-	FieldPMEncryptUntrusted = "X-PM-ENCRYPT-UNTRUSTED"
-	FieldPMMIMEType         = "X-PM-MIMETYPE"
+	FieldPMScheme   = "X-PM-SCHEME"
+	FieldPMSign     = "X-PM-SIGN"
+	FieldPMEncrypt  = "X-PM-ENCRYPT"
+	FieldPMMIMEType = "X-PM-MIMETYPE"
 )
 
 type Cards []*Card
@@ -90,32 +89,19 @@ func (c Card) Get(kr *crypto.KeyRing, key string) ([]*vcard.Field, error) {
 	return dec[key], nil
 }
 
-func (c *Card) Set(kr *crypto.KeyRing, key string, value *vcard.Field) error {
+func (c *Card) Set(kr *crypto.KeyRing, key, value string) error {
 	dec, err := c.decode(kr)
 	if err != nil {
 		return err
 	}
 
 	if field := dec.Get(key); field != nil {
-		field.Value = value.Value
-		field.Params = value.Params
-		field.Group = value.Group
+		field.Value = value
 
 		return c.encode(kr, dec)
 	}
 
-	dec.Add(key, value)
-
-	return c.encode(kr, dec)
-}
-
-func (c *Card) Add(kr *crypto.KeyRing, key string, value *vcard.Field) error {
-	dec, err := c.decode(kr)
-	if err != nil {
-		return err
-	}
-
-	dec.Add(key, value)
+	dec.AddValue(key, value)
 
 	return c.encode(kr, dec)
 }

@@ -75,14 +75,19 @@ func TestAPIError_DeserializeWithDetailsObject(t *testing.T) {
 	"Status": 400,
 	"Code": 1000,
 	"Error": "Foo Bar",
-	"Details": {"object2":{"v":20},"foo":"bar"}
+	"Details": {
+		"object2": {
+			"v": 20
+		},
+		"foo": "bar"
+	}
 }
 `
 	var err proton.APIError
 
 	require.NoError(t, json.Unmarshal([]byte(errJson), &err))
 	require.NotNil(t, err.Details)
-	require.Equal(t, `{"object2":{"v":20},"foo":"bar"}`, err.DetailsToString())
+	require.Equal(t, `{"foo":"bar","object2":{"v":20}}`, err.DetailsToString())
 }
 
 func TestAPIError_DeserializeWithDetailsArray(t *testing.T) {
@@ -91,37 +96,23 @@ func TestAPIError_DeserializeWithDetailsArray(t *testing.T) {
 	"Status": 400,
 	"Code": 1000,
 	"Error": "Foo Bar",
-	"Details": [{"object2":{"v":20},"foo":"bar"},499,"hello"]
+	"Details": [
+		{
+			"object2": {
+				"v": 20
+			},
+			"foo": "bar"
+		},
+		499,
+		"hello"
+	]
 }
 `
 	var err proton.APIError
 
 	require.NoError(t, json.Unmarshal([]byte(errJson), &err))
 	require.NotNil(t, err.Details)
-	require.Equal(t, `[{"object2":{"v":20},"foo":"bar"},499,"hello"]`, err.DetailsToString())
-}
-
-func TestAPIError_DeserializeWithHV(t *testing.T) {
-	errJson := `
-{
-	"Status": 422,
-	"Code": 9001,
-	"Error": "Foo Bar",
-	"Details": {
-		"HumanVerificationMethods": ["captcha", "foo"],
-        "HumanVerificationToken": "token"
-	}
-}
-`
-	var err proton.APIError
-
-	require.NoError(t, json.Unmarshal([]byte(errJson), &err))
-	require.NotNil(t, err.Details)
-	require.True(t, err.IsHVError())
-	hv, e := err.GetHVDetails()
-	require.NoError(t, e)
-	require.Equal(t, []string{"captcha", "foo"}, hv.Methods)
-	require.Equal(t, "token", hv.Token)
+	require.Equal(t, `[{"foo":"bar","object2":{"v":20}},499,"hello"]`, err.DetailsToString())
 }
 
 func TestNetError_RouteInErrorMessage(t *testing.T) {

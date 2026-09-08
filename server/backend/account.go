@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"sync"
+
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/bradenaw/juniper/xslices"
 	"github.com/google/uuid"
@@ -8,15 +10,14 @@ import (
 )
 
 type account struct {
-	userID         string
-	username       string
-	addresses      map[string]*address
-	mailSettings   *mailSettings
-	userSettings   proton.UserSettings
-	contacts       map[string]*proton.Contact
-	contactCounter int
+	userID       string
+	username     string
+	addresses    map[string]*address
+	mailSettings *mailSettings
+	userSettings proton.UserSettings
 
-	auth map[string]auth
+	auth     map[string]auth
+	authLock sync.RWMutex
 
 	keys     []key
 	salt     []byte
@@ -34,7 +35,6 @@ func newAccount(userID, username string, armKey string, salt, verifier []byte) *
 		addresses:    make(map[string]*address),
 		mailSettings: newMailSettings(username),
 		userSettings: newUserSettings(),
-		contacts:     make(map[string]*proton.Contact),
 
 		auth:     make(map[string]auth),
 		keys:     []key{{keyID: uuid.NewString(), key: armKey}},

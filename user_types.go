@@ -7,26 +7,16 @@ type User struct {
 	Email       string
 	Keys        Keys
 
-	UsedSpace uint64
-	MaxSpace  uint64
-	MaxUpload uint64
+	UsedSpace int64
+	MaxSpace  int64
+	MaxUpload int64
 
 	Credit   int64
 	Currency string
-
-	ProductUsedSpace ProductUsedSpace
 }
 
 type DeleteUserReq struct {
 	Reason   string
 	Feedback string
 	Email    string
-}
-
-type ProductUsedSpace struct {
-	Calendar uint64
-	Contact  uint64
-	Drive    uint64
-	Mail     uint64
-	Pass     uint64
 }

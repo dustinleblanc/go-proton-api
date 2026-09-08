@@ -13,13 +13,12 @@ import (
 )
 
 type message struct {
-	messageID        string
-	externalID       string
-	addrID           string
-	labelIDs         []string
-	attIDs           []string
-	inReplyTo        string
-	internalParentID string
+	messageID  string
+	externalID string
+	addrID     string
+	labelIDs   []string
+	attIDs     []string
+	inReplyTo  string
 
 	// sysLabel is the system label for the message.
 	// If nil, the message's flags are used to determine the system label (inbox, sent, drafts).
@@ -34,8 +33,6 @@ type message struct {
 	bccList  []*mail.Address
 	replytos []*mail.Address
 	date     time.Time
-
-	draftAction proton.CreateDraftAction
 
 	armBody  string
 	mimeType rfc822.MIMEType
@@ -95,20 +92,13 @@ func newMessageFromSent(addrID, armBody string, msg *message) *message {
 	}
 }
 
-func newMessageFromTemplate(
-	addrID string,
-	template proton.DraftTemplate,
-	parentRef string,
-	internalParentID string,
-	action proton.CreateDraftAction,
-) *message {
+func newMessageFromTemplate(addrID string, template proton.DraftTemplate, parentRef string) *message {
 	return &message{
-		messageID:        uuid.NewString(),
-		externalID:       template.ExternalID,
-		addrID:           addrID,
-		sysLabel:         pointer(""),
-		inReplyTo:        parentRef,
-		internalParentID: internalParentID,
+		messageID:  uuid.NewString(),
+		externalID: template.ExternalID,
+		addrID:     addrID,
+		sysLabel:   pointer(""),
+		inReplyTo:  parentRef,
 
 		subject: template.Subject,
 		sender:  template.Sender,
@@ -116,8 +106,6 @@ func newMessageFromTemplate(
 		ccList:  template.CCList,
 		bccList: template.BCCList,
 		unread:  bool(template.Unread),
-
-		draftAction: action,
 
 		armBody:  template.Body,
 		mimeType: template.MIMEType,
@@ -198,11 +186,8 @@ func (msg *message) toMetadata(attData map[string][]byte, att map[string]*attach
 		ReplyTos: msg.replytos,
 		Size:     messageSize,
 
-		Flags:        msg.flags,
-		Unread:       proton.Bool(msg.unread),
-		IsForwarded:  msg.flags&proton.MessageFlagForwarded != 0,
-		IsReplied:    msg.flags&proton.MessageFlagReplied != 0,
-		IsRepliedAll: msg.flags&proton.MessageFlagRepliedAll != 0,
+		Flags:  msg.flags,
+		Unread: proton.Bool(msg.unread),
 
 		NumAttachments: len(attData),
 	}
@@ -252,13 +237,10 @@ func (msg *message) getParsedHeaders() proton.Headers {
 		panic(err)
 	}
 
-	parsed := proton.Headers{
-		Values: make(map[string][]string),
-	}
+	parsed := make(proton.Headers)
 
 	header.Entries(func(key, value string) {
-		parsed.Order = append(parsed.Order, key)
-		parsed.Values[key] = append(parsed.Values[key], value)
+		parsed[key] = append(parsed[key], value)
 	})
 
 	return parsed

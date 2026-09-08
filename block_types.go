@@ -21,6 +21,31 @@ type BlockUploadReq struct {
 	RevisionID string
 
 	BlockList []BlockUploadInfo
+
+	// ThumbnailList is omitted when empty so non-photo uploads keep the
+	// exact request shape this fork sent before.
+	ThumbnailList []ThumbnailUploadInfo `json:",omitempty"`
+}
+
+// Thumbnail types, per Proton's own Mac client (PDCore Constants.swift):
+//
+//	Type 1: "default"    -- max 512x512,   max 60KB
+//	Type 2: "photo" (HD) -- max 1920x1920, max 1MB
+const (
+	ThumbnailTypeDefault = 1
+	ThumbnailTypePhoto   = 2
+)
+
+type ThumbnailUploadInfo struct {
+	Type int
+	Size int64
+	Hash string // base64 sha256 of the encrypted thumbnail
+}
+
+type ThumbnailUploadLink struct {
+	Token         string
+	BareURL       string
+	ThumbnailType int
 }
 
 type BlockUploadInfo struct {
@@ -28,6 +53,17 @@ type BlockUploadInfo struct {
 	Size         int64
 	EncSignature string
 	Hash         string
+
+	// Verifier is required by the current /drive/blocks endpoint (added
+	// locally -- this fork predates it). Its absence is what the server's
+	// generic "outdated app" error (Code=2000) actually meant: the request
+	// shape itself is stale, not the App-Version string. See
+	// BuildVerificationToken for how Token is computed.
+	Verifier BlockVerifier
+}
+
+type BlockVerifier struct {
+	Token string // base64-encoded verification token
 }
 
 type BlockUploadLink struct {

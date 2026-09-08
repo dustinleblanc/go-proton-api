@@ -16,19 +16,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bradenaw/juniper/parallel"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/ProtonMail/gluon/async"
 	"github.com/ProtonMail/gluon/rfc822"
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/bradenaw/juniper/iterator"
-	"github.com/bradenaw/juniper/parallel"
 	"github.com/bradenaw/juniper/stream"
 	"github.com/bradenaw/juniper/xslices"
-	"github.com/emersion/go-vcard"
 	"github.com/google/uuid"
 	"github.com/henrybear327/go-proton-api"
-	"github.com/henrybear327/go-proton-api/server/backend"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
 )
@@ -363,8 +361,6 @@ func TestServer_Events(t *testing.T) {
 
 				// Mark a message as read.
 				require.NoError(t, c.MarkMessagesRead(ctx, messageIDs[0]))
-				// Mark a message as forwarded
-				require.NoError(t, c.MarkMessagesForwarded(ctx, messageIDs[0]))
 
 				// The message should eventually be read.
 				require.Eventually(t, func() bool {
@@ -378,7 +374,7 @@ func TestServer_Events(t *testing.T) {
 						return false
 					}
 
-					return !bool(event.Messages[0].Message.Unread) && bool(event.Messages[0].Message.IsForwarded)
+					return !bool(event.Messages[0].Message.Unread)
 				}, 5*time.Second, time.Millisecond*100)
 
 				// Add another message to archive.
@@ -660,8 +656,7 @@ func TestServer_Calls_Manager(t *testing.T) {
 		})
 
 		// Make a non-user request.
-		_, err := m.ReportBug(ctx, proton.ReportBugReq{})
-		require.NoError(t, err)
+		require.NoError(t, m.ReportBug(ctx, proton.ReportBugReq{}))
 
 		// The call should be correct.
 		reportCall := calls[0]
@@ -818,124 +813,6 @@ func TestServer_SendMessage(t *testing.T) {
 			require.Equal(t, "My subject", sent.Subject)
 			require.Equal(t, []*mail.Address{{Address: "recipient@example.com"}}, sent.ToList)
 			require.Contains(t, sent.LabelIDs, proton.SentLabel)
-		})
-	})
-}
-
-func TestServer_SendMessageAttachmentSort(t *testing.T) {
-	withServer(t, func(ctx context.Context, s *Server, m *proton.Manager) {
-		withUser(ctx, t, s, m, "user", "pass", func(c *proton.Client) {
-			user, err := c.GetUser(ctx)
-			require.NoError(t, err)
-
-			addr, err := c.GetAddresses(ctx)
-			require.NoError(t, err)
-
-			salt, err := c.GetSalts(ctx)
-			require.NoError(t, err)
-
-			pass, err := salt.SaltForKey([]byte("pass"), user.Keys.Primary().ID)
-			require.NoError(t, err)
-
-			_, addrKRs, err := proton.Unlock(user, addr, pass, async.NoopPanicHandler{})
-			require.NoError(t, err)
-
-			body, err := os.ReadFile("../testdata/MultipleAttachments.eml")
-			require.NoError(t, err)
-
-			// create the draft
-			draft, err := c.CreateDraft(ctx, addrKRs[addr[0].ID], proton.CreateDraftReq{
-				Message: proton.DraftTemplate{
-					Subject: "My subject",
-					Sender:  &mail.Address{Address: addr[0].Email},
-					ToList:  []*mail.Address{{Address: "user@proton.local"}},
-					Body:    string(body),
-				},
-			})
-			require.NoError(t, err)
-
-			// upload attachments in mixed order
-			{
-				_, err = c.UploadAttachment(ctx, addrKRs[addr[0].ID], proton.CreateAttachmentReq{
-					MessageID:   draft.ID,
-					Filename:    "inlinepart2.png",
-					MIMEType:    "image/png",
-					Disposition: proton.InlineDisposition,
-					ContentID:   "part2.erfefw",
-				})
-				require.NoError(t, err)
-
-				_, err = c.UploadAttachment(ctx, addrKRs[addr[0].ID], proton.CreateAttachmentReq{
-					MessageID:   draft.ID,
-					Filename:    "alphabeticalZZZZ.png",
-					MIMEType:    "image/png",
-					Disposition: proton.AttachmentDisposition,
-				})
-				require.NoError(t, err)
-
-				_, err = c.UploadAttachment(ctx, addrKRs[addr[0].ID], proton.CreateAttachmentReq{
-					MessageID:   draft.ID,
-					Filename:    "inlinepart1.png",
-					MIMEType:    "image/png",
-					Disposition: proton.InlineDisposition,
-					ContentID:   "part1.erfefw",
-				})
-				require.NoError(t, err)
-
-				_, err = c.UploadAttachment(ctx, addrKRs[addr[0].ID], proton.CreateAttachmentReq{
-					MessageID:   draft.ID,
-					Filename:    "alphabeticalAAA.png",
-					MIMEType:    "image/png",
-					Disposition: proton.AttachmentDisposition,
-				})
-				require.NoError(t, err)
-			}
-
-			// prepare the package
-			var req proton.SendDraftReq
-			attkeys := make(map[string]*crypto.SessionKey)
-			err = req.AddTextPackage(addrKRs[addr[0].ID], string(body), "text/html", map[string]proton.SendPreferences{"user@proton.local": {
-				Encrypt:          true,
-				PubKey:           addrKRs[addr[0].ID],
-				SignatureType:    proton.DetachedSignature,
-				EncryptionScheme: proton.InternalScheme,
-				MIMEType:         rfc822.TextHTML,
-			}}, attkeys)
-			require.NoError(t, err)
-
-			// send the draft
-			sent, err := c.SendDraft(ctx, draft.ID, req)
-			require.NoError(t, err)
-
-			// Check attachment order
-			require.Equal(t, 4, len(sent.Attachments))
-			require.Equal(t, "inlinepart1.png", sent.Attachments[0].Name)
-			require.Equal(t, "inlinepart2.png", sent.Attachments[1].Name)
-			require.Equal(t, "alphabeticalAAA.png", sent.Attachments[2].Name)
-			require.Equal(t, "alphabeticalZZZZ.png", sent.Attachments[3].Name)
-
-			// catch the message created event from the receiver
-			rawEventID, err := c.GetLatestEventID(ctx)
-			require.NoError(t, err)
-			var eventID backend.ID
-			err = eventID.FromString(rawEventID)
-			require.NoError(t, err)
-			eventID = eventID - 1
-			events, _, err := c.GetEvent(ctx, eventID.String())
-			require.NoError(t, err)
-			require.Equal(t, 1, len(events))
-			require.Equal(t, 1, len(events[0].Messages))
-
-			// get the message from receiver inbox
-			rcv, err := c.GetMessage(ctx, events[0].Messages[0].Message.ID)
-			require.NoError(t, err)
-
-			// Check attachment order
-			require.Equal(t, 4, len(rcv.Attachments))
-			require.Equal(t, "inlinepart1.png", rcv.Attachments[0].Name)
-			require.Equal(t, "inlinepart2.png", rcv.Attachments[1].Name)
-			require.Equal(t, "alphabeticalAAA.png", sent.Attachments[2].Name)
-			require.Equal(t, "alphabeticalZZZZ.png", sent.Attachments[3].Name)
 		})
 	})
 }
@@ -2231,302 +2108,6 @@ func TestServer_GetMessageGroupCount(t *testing.T) {
 
 		})
 	})
-}
-
-func TestServer_TestDraftActions(t *testing.T) {
-	withServer(t, func(ctx context.Context, s *Server, m *proton.Manager) {
-		withUser(ctx, t, s, m, "user", "pass", func(c *proton.Client) {
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-
-			user, err := c.GetUser(ctx)
-			require.NoError(t, err)
-
-			addr, err := c.GetAddresses(ctx)
-			require.NoError(t, err)
-
-			salt, err := c.GetSalts(ctx)
-			require.NoError(t, err)
-
-			pass, err := salt.SaltForKey([]byte("pass"), user.Keys.Primary().ID)
-			require.NoError(t, err)
-
-			_, addrKRs, err := proton.Unlock(user, addr, pass, async.NoopPanicHandler{})
-			require.NoError(t, err)
-
-			type testData struct {
-				action proton.CreateDraftAction
-				flag   proton.MessageFlag
-			}
-
-			tests := []testData{
-				{
-					action: proton.ReplyAction,
-					flag:   proton.MessageFlagReplied,
-				},
-				{
-					action: proton.ReplyAllAction,
-					flag:   proton.MessageFlagRepliedAll,
-				},
-				{
-					action: proton.ForwardAction,
-					flag:   proton.MessageFlagForwarded,
-				},
-			}
-
-			importedMessages := importMessages(ctx, t, c, addr[0].ID, addrKRs[addr[0].ID], []string{}, 0, len(tests))
-
-			for i := 0; i < len(tests); i++ {
-				importedMessageID := importedMessages[i].MessageID
-
-				msg, err := c.GetMessage(ctx, importedMessageID)
-				require.NoError(t, err)
-
-				{
-					kr := addrKRs[addr[0].ID]
-					msg, err := c.CreateDraft(ctx, kr, proton.CreateDraftReq{
-						Message: proton.DraftTemplate{
-							Subject: "Foo",
-							Sender:  &mail.Address{Address: addr[0].Email},
-							ToList:  []*mail.Address{{Address: "foo@bar"}},
-							CCList:  nil,
-							BCCList: nil,
-						},
-						AttachmentKeyPackets: nil,
-						ParentID:             msg.ID,
-						Action:               tests[i].action,
-					})
-
-					require.NoError(t, err)
-
-					var sreq proton.SendDraftReq
-
-					require.NoError(t, sreq.AddTextPackage(kr, "Hello", "text/plain", map[string]proton.SendPreferences{}, map[string]*crypto.SessionKey{}))
-
-					_, err = c.SendDraft(ctx, msg.ID, sreq)
-					require.NoError(t, err)
-
-					msg, err = c.GetMessage(ctx, importedMessageID)
-					require.NoError(t, err)
-					require.True(t, msg.Flags&tests[i].flag != 0)
-				}
-			}
-
-		})
-	})
-}
-
-func TestServer_Contacts(t *testing.T) {
-	withServer(t, func(ctx context.Context, s *Server, m *proton.Manager) {
-		withUser(ctx, t, s, m, "user", "pass", func(c *proton.Client) {
-
-			user, err := c.GetUser(ctx)
-			require.NoError(t, err)
-
-			addr, err := c.GetAddresses(ctx)
-			require.NoError(t, err)
-
-			salt, err := c.GetSalts(ctx)
-			require.NoError(t, err)
-
-			pass, err := salt.SaltForKey([]byte("pass"), user.Keys.Primary().ID)
-			require.NoError(t, err)
-
-			_, addrKRs, err := proton.Unlock(user, addr, pass, async.NoopPanicHandler{})
-			require.NoError(t, err)
-
-			type testContact struct {
-				Name  string
-				Email string
-			}
-
-			testContacts := []testContact{
-				{
-					Name:  "foo",
-					Email: "foo@bar.com",
-				},
-				{
-					Name:  "bar",
-					Email: "bar@bar.com",
-				},
-				{
-					Name:  "zz",
-					Email: "zz@bar.com",
-				},
-			}
-
-			contactDesc := []proton.ContactCards{
-				{
-					Cards: xslices.Map(testContacts, func(contact testContact) *proton.Card {
-						return createVCard(t, addrKRs[addr[0].ID], contact.Name, contact.Email)
-					}),
-				},
-			}
-			createReq := proton.CreateContactsReq{
-				Contacts:  contactDesc,
-				Overwrite: 0,
-				Labels:    0,
-			}
-
-			contactsRes, err := c.CreateContacts(ctx, createReq)
-			require.NoError(t, err)
-			assert.Equal(t, 3, len(contactsRes))
-
-			contacts, err := c.GetAllContactsPaged(ctx, 2)
-			require.NoError(t, err)
-			require.Len(t, contacts, len(testContacts))
-
-			for _, v := range testContacts {
-				require.NotEqual(t, -1, xslices.IndexFunc(contacts, func(contact proton.Contact) bool {
-					return contact.Name == v.Name
-				}))
-			}
-		})
-	})
-}
-
-func TestServer_ContactEmails(t *testing.T) {
-	withServer(t, func(ctx context.Context, s *Server, m *proton.Manager) {
-		withUser(ctx, t, s, m, "user", "pass", func(c *proton.Client) {
-
-			user, err := c.GetUser(ctx)
-			require.NoError(t, err)
-
-			addr, err := c.GetAddresses(ctx)
-			require.NoError(t, err)
-
-			salt, err := c.GetSalts(ctx)
-			require.NoError(t, err)
-
-			pass, err := salt.SaltForKey([]byte("pass"), user.Keys.Primary().ID)
-			require.NoError(t, err)
-
-			_, addrKRs, err := proton.Unlock(user, addr, pass, async.NoopPanicHandler{})
-			require.NoError(t, err)
-
-			type testContact struct {
-				Name   string
-				Emails []string
-			}
-
-			testContacts := []testContact{
-				{
-					Name:   "foo",
-					Emails: []string{"foo@bar.com", "alias@alias.com", "nn@zz.com", "abc@4.de", "001234@00.com"},
-				},
-				{
-					Name:   "bar",
-					Emails: []string{"bar@bar.com"},
-				},
-				{
-					Name:   "zz",
-					Emails: []string{"zz@bar.com", "zz@zz2.com"},
-				},
-			}
-
-			contactDesc := []proton.ContactCards{
-				{
-					Cards: xslices.Map(testContacts, func(contact testContact) *proton.Card {
-						return createVCard(t, addrKRs[addr[0].ID], contact.Name, contact.Emails...)
-					}),
-				},
-			}
-			createReq := proton.CreateContactsReq{
-				Contacts:  contactDesc,
-				Overwrite: 0,
-				Labels:    0,
-			}
-
-			contactsRes, err := c.CreateContacts(ctx, createReq)
-			require.NoError(t, err)
-			assert.Equal(t, 3, len(contactsRes))
-
-			for _, v := range testContacts {
-				for _, email := range v.Emails {
-					emails, err := c.GetAllContactEmailsPaged(ctx, email, 2)
-					require.NoError(t, err)
-					require.Len(t, emails, 1)
-					assert.Equal(t, email, emails[0].Email)
-				}
-			}
-		})
-	})
-}
-
-func TestServer_ContactEmailsRepeated(t *testing.T) {
-	withServer(t, func(ctx context.Context, s *Server, m *proton.Manager) {
-		withUser(ctx, t, s, m, "user", "pass", func(c *proton.Client) {
-
-			user, err := c.GetUser(ctx)
-			require.NoError(t, err)
-
-			addr, err := c.GetAddresses(ctx)
-			require.NoError(t, err)
-
-			salt, err := c.GetSalts(ctx)
-			require.NoError(t, err)
-
-			pass, err := salt.SaltForKey([]byte("pass"), user.Keys.Primary().ID)
-			require.NoError(t, err)
-
-			_, addrKRs, err := proton.Unlock(user, addr, pass, async.NoopPanicHandler{})
-			require.NoError(t, err)
-
-			type testContact struct {
-				Name   string
-				Emails []string
-			}
-
-			testContacts := []testContact{
-				{
-					Name:   "foo",
-					Emails: []string{"foo@bar.com"},
-				},
-				{
-					Name:   "bar",
-					Emails: []string{"foo@bar.com"},
-				},
-				{
-					Name:   "zz",
-					Emails: []string{"foo@bar.com"},
-				},
-			}
-
-			contactDesc := []proton.ContactCards{
-				{
-					Cards: xslices.Map(testContacts, func(contact testContact) *proton.Card {
-						return createVCard(t, addrKRs[addr[0].ID], contact.Name, contact.Emails...)
-					}),
-				},
-			}
-			createReq := proton.CreateContactsReq{
-				Contacts:  contactDesc,
-				Overwrite: 0,
-				Labels:    0,
-			}
-
-			contactsRes, err := c.CreateContacts(ctx, createReq)
-			require.NoError(t, err)
-			assert.Equal(t, 3, len(contactsRes))
-
-			emails, err := c.GetAllContactEmailsPaged(ctx, "foo@bar.com", 2)
-			require.NoError(t, err)
-			require.Len(t, emails, len(testContacts))
-		})
-	})
-}
-
-func createVCard(t *testing.T, addrKR *crypto.KeyRing, name string, email ...string) *proton.Card {
-	card, err := proton.NewCard(addrKR, proton.CardTypeSigned)
-	require.NoError(t, err)
-
-	require.NoError(t, card.Set(addrKR, vcard.FieldUID, &vcard.Field{Value: fmt.Sprintf("proton-legacy-%v", uuid.NewString()), Group: "test"}))
-	require.NoError(t, card.Set(addrKR, vcard.FieldFormattedName, &vcard.Field{Value: name, Group: "test"}))
-	for _, email := range email {
-		require.NoError(t, card.Add(addrKR, vcard.FieldEmail, &vcard.Field{Value: email, Group: "test"}))
-	}
-
-	return card
 }
 
 func withServer(t *testing.T, fn func(ctx context.Context, s *Server, m *proton.Manager), opts ...Option) {

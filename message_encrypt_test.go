@@ -1,4 +1,4 @@
-package proton_test
+package proton
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/ProtonMail/gluon/rfc822"
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
-	"github.com/henrybear327/go-proton-api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +27,7 @@ This is explicitly typed plain ASCII text.
 	kr, err := crypto.NewKeyRing(key)
 	require.NoError(t, err)
 
-	encryptedMessage, err := proton.EncryptRFC822(kr, []byte(message))
+	encryptedMessage, err := EncryptRFC822(kr, []byte(message))
 	require.NoError(t, err)
 
 	section := rfc822.Parse(encryptedMessage)
@@ -86,7 +85,7 @@ This is the epilogue.  It is also to be ignored.
 	kr, err := crypto.NewKeyRing(key)
 	require.NoError(t, err)
 
-	encryptedMessage, err := proton.EncryptRFC822(kr, []byte(message))
+	encryptedMessage, err := EncryptRFC822(kr, []byte(message))
 	require.NoError(t, err)
 
 	section := rfc822.Parse(encryptedMessage)
@@ -168,7 +167,7 @@ SGVsbG8gQXR0YWNobWVudA==
 	kr, err := crypto.NewKeyRing(key)
 	require.NoError(t, err)
 
-	encryptedMessage, err := proton.EncryptRFC822(kr, []byte(message))
+	encryptedMessage, err := EncryptRFC822(kr, []byte(message))
 	require.NoError(t, err)
 
 	section := rfc822.Parse(encryptedMessage)
@@ -217,98 +216,6 @@ SGVsbG8gQXR0YWNobWVudA==
 		assert.Equal(t, header.Get("Content-Transfer-Encoding"), "base64")
 		assert.Equal(t, header.Get("Content-Disposition"), `attachment; filename="test.pdf"`)
 		assert.Equal(t, header.Get("Content-type"), `application/pdf; name="test.pdf"`)
-
-		body := child.Body()
-
-		// Read the body.
-		bodyDecoded, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, bytes.NewReader(body)))
-		require.NoError(t, err)
-
-		// Unarmor the PGP message.
-		enc := crypto.NewPGPMessage(bodyDecoded)
-
-		// Decrypt the PGP message.
-		dec, err := kr.Decrypt(enc, nil, crypto.GetUnixTime())
-		require.NoError(t, err)
-		require.Equal(t, "Hello Attachment", dec.GetString())
-	}
-}
-
-func TestEncryptMessage_Inline(t *testing.T) {
-	const message = `From: Nathaniel Borenstein <nsb@bellcore.com>
-To:  Ned Freed <ned@innosoft.com>
-Subject: Sample message (import inline)
-MIME-Version: 1.0
-Content-type: multipart/related; boundary="BOUNDARY"
-
---BOUNDARY
-Content-type: text/plain; charset=us-ascii
-
-Hello world
---BOUNDARY
-Content-Type: image/gif; name="email-action-left.gif"
-Content-Transfer-Encoding: base64
-Content-ID: <part1.D96BFAE9.E2E1CAE3@protonmail.com>
-Content-Disposition: inline; filename="email-action-left.gif"
-
-SGVsbG8gQXR0YWNobWVudA==
---BOUNDARY--
-`
-	key, err := crypto.GenerateKey("foobar", "foo@bar.com", "x25519", 0)
-	require.NoError(t, err)
-
-	kr, err := crypto.NewKeyRing(key)
-	require.NoError(t, err)
-
-	encryptedMessage, err := proton.EncryptRFC822(kr, []byte(message))
-	require.NoError(t, err)
-
-	section := rfc822.Parse(encryptedMessage)
-
-	{
-		// Check root header:
-		header, err := section.ParseHeader()
-		require.NoError(t, err)
-
-		assert.Equal(t, header.Get("From"), "Nathaniel Borenstein <nsb@bellcore.com>")
-		assert.Equal(t, header.Get("To"), "Ned Freed <ned@innosoft.com>")
-		assert.Equal(t, header.Get("Subject"), "Sample message (import inline)")
-		assert.Equal(t, header.Get("MIME-Version"), "1.0")
-
-		mediaType, params, err := rfc822.ParseMediaType(header.Get("Content-Type"))
-		require.NoError(t, err)
-		assert.Equal(t, "multipart/related", mediaType)
-		assert.NotEmpty(t, params["boundary"])
-	}
-
-	children, err := section.Children()
-	require.NoError(t, err)
-	require.Equal(t, 2, len(children))
-
-	{
-		// check first child.
-		child := children[0]
-		header, err := child.ParseHeader()
-		require.NoError(t, err)
-
-		header.Entries(func(key, value string) {
-			// Old header should be deleted.
-			assert.NotEqual(t, key, "Content-type")
-			assert.NotEqual(t, value, "text/plain; charset=us-ascii")
-		})
-
-		assert.Equal(t, header.Get("Content-Type"), "text/plain; charset=utf-8")
-	}
-
-	{
-		// check second child.
-		child := children[1]
-		header, err := child.ParseHeader()
-		require.NoError(t, err)
-
-		assert.Equal(t, header.Get("Content-Transfer-Encoding"), "base64")
-		assert.Equal(t, header.Get("Content-Disposition"), `inline; filename="email-action-left.gif"`)
-		assert.Equal(t, header.Get("Content-type"), `image/gif; name="email-action-left.gif"`)
 
 		body := child.Body()
 

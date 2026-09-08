@@ -26,9 +26,6 @@ func initRouter(s *Server) {
 		s.applyRateLimit(),
 	)
 
-	// Feature flag route. Needs to be updated when user specific feature flags are implemented
-	s.r.GET("/feature/v2/frontend", s.handleGetFeatures())
-
 	if core := s.r.Group("/core/v4"); core != nil {
 		// Domains routes don't need authentication.
 		if domains := core.Group("/domains"); domains != nil {
@@ -38,7 +35,6 @@ func initRouter(s *Server) {
 		// Reporting a bug is also possible without authentication.
 		if reports := core.Group("/reports"); reports != nil {
 			reports.POST("/bug", s.handlePostReportBug())
-			reports.POST("/bug/attachments", s.handlePostReportBugAttachments())
 		}
 
 		// These routes require auth.
@@ -85,9 +81,6 @@ func initRouter(s *Server) {
 		if settings := mail.Group("/settings"); settings != nil {
 			settings.GET("", s.handleGetMailSettings())
 			settings.PUT("/attachpublic", s.handlePutMailSettingsAttachPublicKey())
-			settings.PUT("/drafttype", s.handlePutMailSettingsDraftType())
-			settings.PUT("/sign", s.handlePutMailSettingsSign())
-			settings.PUT("/pgpscheme", s.handlePutMailSettingsPGPScheme())
 		}
 
 		if messages := mail.Group("/messages"); messages != nil {
@@ -104,8 +97,6 @@ func initRouter(s *Server) {
 			messages.POST("/import", s.handlePutMailMessagesImport())
 			messages.PUT("/delete", s.handleDeleteMailMessages())
 			messages.GET("/count", s.handleMessageGroupCount())
-			messages.PUT("/forward", s.handlePutMailMessagesForwarded())
-			messages.PUT("/unforward", s.handlePutMailMessagesUnforwarded())
 		}
 
 		if attachments := mail.Group("/attachments"); attachments != nil {
@@ -116,10 +107,6 @@ func initRouter(s *Server) {
 
 	// All contacts routes need authentication.
 	if contacts := s.r.Group("/contacts/v4", s.requireAuth()); contacts != nil {
-		contacts.GET("", s.handleGetContacts())
-		contacts.POST("", s.handlePostContacts())
-		contacts.GET("/:contactID", s.handleGetContact())
-		contacts.PUT("/:contactID", s.handlePutContact())
 		contacts.GET("/emails", s.handleGetContactsEmails())
 	}
 
@@ -129,8 +116,6 @@ func initRouter(s *Server) {
 			stats.POST("", s.handlePostDataStats())
 			stats.POST("/multiple", s.handlePostDataStatsMultiple())
 		}
-		// Observability endpoint
-		data.POST("/metrics", s.handleObservabilityPost())
 	}
 
 	// Top level auth routes don't need authentication.

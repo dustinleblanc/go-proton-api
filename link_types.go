@@ -34,10 +34,15 @@ type Link struct {
 	NodePassphrase          string // The passphrase used to unlock the NodeKey, encrypted by the owning Link/Share keyring.
 	NodePassphraseSignature string
 	SignatureEmail          string // Signature email for the NodePassphraseSignature
-	XAttr                   string // Modification time and size from the file system
 
 	FileProperties   *FileProperties
 	FolderProperties *FolderProperties
+
+	// XAttr: added locally for compatibility with a newer Proton-API-Bridge
+	// (GetActiveRevisionAttrs) that expects this at the Link level; not
+	// part of this fork's original API response shape and unused by our
+	// upload path.
+	XAttr string
 }
 
 type LinkState int

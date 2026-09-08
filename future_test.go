@@ -1,4 +1,4 @@
-package proton_test
+package proton
 
 import (
 	"math/rand"
@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/ProtonMail/gluon/async"
-	"github.com/henrybear327/go-proton-api"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFuture(t *testing.T) {
 	resCh := make(chan int)
 
-	proton.NewFuture(async.NoopPanicHandler{}, func() (int, error) {
+	NewFuture(async.NoopPanicHandler{}, func() (int, error) {
 		return 42, nil
 	}).Then(func(res int, err error) {
 		resCh <- res
@@ -23,7 +22,7 @@ func TestFuture(t *testing.T) {
 }
 
 func TestGroup(t *testing.T) {
-	group := proton.NewGroup[int](async.NoopPanicHandler{})
+	group := NewGroup[int](async.NoopPanicHandler{})
 
 	for i := 0; i < 10; i++ {
 		i := i

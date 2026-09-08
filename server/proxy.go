@@ -4,20 +4,18 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/henrybear327/go-proton-api"
 )
 
-func (s *proxyServer) newProxy(path string) http.HandlerFunc {
-	origin, err := url.Parse(s.origin)
+func newProxy(proxyOrigin, base, path string, transport http.RoundTripper) http.HandlerFunc {
+	origin, err := url.Parse(proxyOrigin)
 	if err != nil {
 		panic(err)
 	}
@@ -26,40 +24,12 @@ func (s *proxyServer) newProxy(path string) http.HandlerFunc {
 		Director: func(req *http.Request) {
 			req.URL.Scheme = origin.Scheme
 			req.URL.Host = origin.Host
-			req.URL.Path = origin.Path + strings.TrimPrefix(path, s.base)
+			req.URL.Path = origin.Path + strings.TrimPrefix(path, base)
 			req.Host = origin.Host
 		},
 
-		ModifyResponse: s.targetResponseModifier,
-		ErrorHandler:   s.targetErrorHandler,
-
-		Transport: s.transport,
+		Transport: transport,
 	}).ServeHTTP
-}
-
-func (s *proxyServer) targetResponseModifier(r *http.Response) error {
-	if s.debug {
-		fmt.Printf("PROXY RESP %d: %s %s\n", r.StatusCode, r.Request.Method, r.Request.RequestURI)
-	}
-	if r.StatusCode == http.StatusInternalServerError || r.StatusCode == http.StatusBadGateway {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			body = []byte(fmt.Sprintf(`{"read_error": "%v"}`, err))
-		}
-
-		fmt.Printf("PROXY RESP %d CHANGING TO 429: %s %s\n=====BODY=====\n%s\n", r.StatusCode, r.Request.Method, r.Request.RequestURI, string(body))
-		r.StatusCode = http.StatusTooManyRequests
-		r.Body = io.NopCloser(bytes.NewReader(body))
-	}
-	return nil
-}
-
-func (s *proxyServer) targetErrorHandler(rw http.ResponseWriter, r *http.Request, targetError error) {
-	if s.debug {
-		fmt.Printf("PROXY ERROR: %s %s: %v\n", r.Method, r.RequestURI, targetError)
-	}
-
-	rw.WriteHeader(http.StatusTooManyRequests)
 }
 
 func (s *Server) handleProxy(base string) gin.HandlerFunc {
@@ -170,8 +140,6 @@ type proxyServer struct {
 	origin, base string
 
 	transport http.RoundTripper
-
-	debug bool
 }
 
 func newProxyServer(origin, base string, transport http.RoundTripper) *proxyServer {
@@ -180,7 +148,6 @@ func newProxyServer(origin, base string, transport http.RoundTripper) *proxyServ
 		origin:    origin,
 		base:      base,
 		transport: transport,
-		debug:     os.Getenv("GO_PROTON_API_SERVER_LOGGER_ENABLED") != "",
 	}
 }
 
@@ -194,7 +161,7 @@ func (s *proxyServer) handle(path string, h func(func(string) HandlerFunc) http.
 			buf := new(bytes.Buffer)
 
 			// Call the proxy, capturing whatever data it writes.
-			s.newProxy(path)(&writerWrapper{w, buf}, r)
+			newProxy(s.origin, s.base, path, s.transport)(&writerWrapper{w, buf}, r)
 
 			// If there is a gzip header entry, decode it.
 			if strings.Contains(w.Header().Get("Content-Encoding"), "gzip") {
