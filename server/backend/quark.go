@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/henrybear327/go-proton-api"
+	"github.com/ProtonMail/go-proton-api"
 )
 
 func (s *Backend) RunQuarkCommand(command string, args ...string) (any, error) {
