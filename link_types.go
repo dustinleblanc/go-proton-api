@@ -211,12 +211,27 @@ func (revisionMetadata *RevisionMetadata) GetDecXAttrString(addrKR, nodeKR *cryp
 	return &data.Common, nil
 }
 
+// Thumbnail is one rendered preview attached to a revision. Hash is the
+// base64 sha256 of the ENCRYPTED thumbnail data, used to verify integrity
+// after download. Type is ThumbnailTypeDefault (1) or ThumbnailTypePhoto (2).
+type Thumbnail struct {
+	ThumbnailID string
+	Size        int64
+	Type        int
+	Hash        string
+}
+
 // Revisions are only for files, they represent “versions” of files.
 // Each file can have 1 active revision and n obsolete revisions.
 type Revision struct {
 	RevisionMetadata
 
 	Blocks []Block
+
+	// Thumbnails lists the revision's rendered previews. The encrypted
+	// thumbnail blocks are located via GetThumbnails (POST
+	// /drive/volumes/{volumeID}/thumbnails) and decrypted client-side.
+	Thumbnails []Thumbnail
 }
 
 func (revision *Revision) GetDecXAttrString(addrKR, nodeKR *crypto.KeyRing) (*RevisionXAttrCommon, error) {
